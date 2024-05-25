@@ -3,6 +3,14 @@
 # Add steps that analyze code, save build artifacts, deploy, and more:
 # https://docs.microsoft.com/azure/devops/pipelines/languages/javascript
 
+variables:
+- name: subscriptionName
+  value: 'AzureSponsorSandbox' 
+- name: storageContainer
+  value: 'Sandbox' 
+- name: storageAccount
+  value: 'ffthhstoragestanb' 
+
 trigger:
 - main
 
@@ -21,3 +29,19 @@ steps:
     CI=true yarn test
   displayName: 'yarn install and build'
 
+- task: AzureCLI@2
+  displayName: Upload to Azure Storage Account
+  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+  inputs:
+    azureSubscription: '$(subscriptionName)'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      echo "STEP: Setup"
+      az --version
+      az account show
+      az config set extension.use_dynamic_install=yes_without_prompt
+      echo "STEP: Removing blobs from storage"
+      az storage azcopy blob delete -c '$(web)' --account-name '$(storageAccount)' --recursive
+      echo "STEP: Uploading blobs to storage"
+      az storage azcopy blob upload -c '$(web)' --account-name '$(storageAccount)' -s "build/*" --recursive
